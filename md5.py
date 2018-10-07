@@ -8,13 +8,6 @@ INITIAL_STATE = (0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476)
 BYTES_PER_CHUNK = 64
 ORIGINAL_SIZE_BYTE_COUNT = 8  # bytes needed for original message size
 PADDING_BYTE = b"\x00"
-BITS_PER_BYTE = 8
-
-HELP_TEXT = """\
-Computes the MD5 hash of a bytestring without the hashlib module.
-Argument: bytestring in hexadecimal (an even number of digits 0-9 and a-f;
-"" = zero-length string)\
-"""
 
 def _prepare_message(message):
     originalLen = len(message)
@@ -31,12 +24,13 @@ def _prepare_message(message):
     message += paddingSize * PADDING_BYTE
 
     # append original length in bits modulo 2**64 (eight little-endian bytes)
-    originalLenInBits = (originalLen * BITS_PER_BYTE) & 0xffff_ffff_ffff_ffff
+    originalLenInBits = (originalLen * 8) % 2**64
     return message + struct.pack("<Q", originalLenInBits)
 
 def _generate_chunks(message):
     """Prepare the message and generate it in chunks of 16 unsigned 32-bit
     little-endian integers (64 bytes, 512 bits)."""
+
     for chunk in struct.iter_unpack("<16I", _prepare_message(message)):
         yield chunk
 
@@ -44,8 +38,7 @@ def _hash_chunk(state, chunk):
     """Hash one chunk.
     state: 4 unsigned 32-bit integers
     chunk: 16 unsigned 32-bit integers
-    return: 4 unsigned 32-bit integers
-    """
+    return: 4 unsigned 32-bit integers"""
 
     (a, b, c, d) = state
 
@@ -80,8 +73,8 @@ def _hash_chunk(state, chunk):
     return (a, b, c, d)
 
 def hash(message):
-    """Hash a string of bytes. Return the hash as 16 bytes.
-    http://en.wikipedia.org/wiki/MD5#Pseudocode"""
+    """Hash a string of bytes. Return the hash as 16 bytes. See references."""
+
     state = list(INITIAL_STATE)
     for chunk in _generate_chunks(message):
         hash = _hash_chunk(state, chunk)
@@ -89,18 +82,19 @@ def hash(message):
     return b"".join(struct.pack("<I", number) for number in state)
 
 def hexadecimal_hash(message):
-    """Hash a string of bytes. Return hash in hexadecimal."""
+    """Hash a string of bytes. Return the hash in hexadecimal."""
+
     return binascii.hexlify(hash(message)).decode("ascii")
 
 def main():
     if len(sys.argv) != 2:
-        exit(HELP_TEXT)
+        exit("Error: invalid number of arguments. See the readme file.")
 
     message = sys.argv[1]
     try:
         message = binascii.unhexlify(message)
     except binascii.Error:
-        exit("Error: invalid hexadecimal string of bytes.")
+        exit("Error: invalid argument. See the readme file.")
 
     print(hexadecimal_hash(message))
 
