@@ -1,24 +1,23 @@
-"""An implementation of the MD5 algorithm."""
+# an MD5 implementation; see http://en.wikipedia.org/wiki/MD5
 
 import math, struct, sys
 
-def _pad_message(message):
-    # append terminator byte, padding and original length in bits modulo 2 ** 64;
-    # the new length will be a multiple of 64 bytes (512 bits)
-    paddingSize = (64 - 1 - 8 - len(message) % 64) % 64
-    lengthInBits = (len(message) * 8) % 2 ** 64
-    return message + b"\x80" + paddingSize * b"\x00" + struct.pack("<Q", lengthInBits)
+def pad_message(message):
+    # append terminator byte, padding and original length in bits modulo
+    # 2 ** 64; the new length will be a multiple of 64 bytes (512 bits)
+    padLen = (64 - 1 - 8 - len(message) % 64) % 64
+    lenBits = (len(message) * 8) % 2 ** 64
+    return message + b"\x80" + padLen * b"\x00" + struct.pack("<Q", lenBits)
 
-def _rotate_left(n, bits):
+def rotate_left(n, bits):
     # rotate a 32-bit integer left
-    return ((n << bits) & 0xffffffff) | (n >> (32 - bits))
+    return ((n << bits) & 0xffff_ffff) | (n >> (32 - bits))
 
-def _hash_chunk(state, chunk):
+def hash_chunk(state, chunk):
     # hash one chunk
-    # http://en.wikipedia.org/wiki/MD5#Pseudocode
-    # state: 4 * 32-bit int (128 bits)
-    # chunk: 16 * 32-bit int (512 bits)
-    # return: 4 * 32-bit int (128 bits)
+    # state:   4 * 32 = 128 bits
+    # chunk:  16 * 32 = 512 bits
+    # return:  4 * 32 = 128 bits
 
     (a, b, c, d) = state
 
@@ -40,26 +39,26 @@ def _hash_chunk(state, chunk):
             index = (7 * r) & 15
             shift = (6, 10, 15, 21)[r & 3]
 
-        const = math.floor(abs(math.sin(r + 1)) * 0x100000000)
-        bAdd = (const + a + bits + chunk[index]) & 0xffffffff
-        bAdd = _rotate_left(bAdd, shift)
-        (a, b, c, d) = (d, (b + bAdd) & 0xffffffff, b, c)
+        const = math.floor(abs(math.sin(r + 1)) * 0x1_0000_0000)
+        bAdd = (const + a + bits + chunk[index]) & 0xffff_ffff
+        bAdd = rotate_left(bAdd, shift)
+        (a, b, c, d) = (d, (b + bAdd) & 0xffff_ffff, b, c)
 
     return (a, b, c, d)
 
 def md5(message):
-    """Hash a bytestring. Return the hash as 16 bytes."""
+    # hash a bytestring; return the hash as 16 bytes
 
     # initialize state of algorithm (4 * 32 bits = 128 bits)
-    state = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]
+    state = [0x6745_2301, 0xefcd_ab89, 0x98ba_dcfe, 0x1032_5476]
 
     # pad message to a multiple of 512 bits
-    message = _pad_message(message)
+    message = pad_message(message)
 
     # add the hash of each 512-bit (16 * 32-bit) chunk to the state
     for chunk in struct.iter_unpack("<16I", message):
-        hash_ = _hash_chunk(state, chunk)
-        state = [(s + h) & 0xffffffff for (s, h) in zip(state, hash_)]
+        hash_ = hash_chunk(state, chunk)
+        state = [(s + h) & 0xffff_ffff for (s, h) in zip(state, hash_)]
 
     # final state = hash of entire message
     return struct.pack("<4I", *state)
@@ -80,12 +79,14 @@ assert md5(100 * b"abc").hex() == "f571117acbd8153c8dc3c81b8817773a"
 
 def main():
     if len(sys.argv) != 2:
-        sys.exit("Compute the MD5 hash of a bytestring. Argument: bytestring_in_hexadecimal")
+        sys.exit(
+            "Compute the MD5 hash of a bytestring. Argument: bytestring in "
+            "hexadecimal"
+        )
     try:
         message = bytes.fromhex(sys.argv[1])
     except ValueError:
-        sys.exit("Error: invalid argument.")
+        sys.exit("Invalid hexadecimal bytestring.")
     print(md5(message).hex())
 
-if __name__ == "__main__":
-    main()
+main()
